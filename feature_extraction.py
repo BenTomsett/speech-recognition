@@ -2,11 +2,9 @@
 # Extracts features from audio files for use in training/testing/using a neural network for speech recognition
 # Author: Ben Tomsett
 
-import glob
-import soundfile as sf
 import numpy as np
-from pathlib import Path
 from scipy.fft import dct
+import soundfile as sf
 
 
 def framed_signal(signal, sample_rate, frame_length=20, overlap=10):
@@ -50,22 +48,33 @@ def windowed_signal(frames):
     return frames * np.hamming(len(frames[0]))
 
 
-def magnitude_spectrum(frames):
+def power_spectrum(frames, NFFT):
     """
-    Calculates the magnitude spectrum of each frame in a set of frames. Removes the redundant half of the spectrum.
+    Calculates the power spectrum of each frame in a set of frames.
     :param frames: A two-dimensional array containing the frames to be windowed
-    :return: A two-dimensional array containing the magnitude spectrum of each frame
+    :param NFFT: The number of samples to be used in the FFT
+    :return: A two-dimensional array containing the power spectrum of each frame
     """
-
-    mag_spec = np.abs(np.fft.fft(frames))
-    return mag_spec[:, 0:int(len(mag_spec[0]) / 2)]
+    mag_frames = np.absolute(np.fft.rfft(frames, NFFT))
+    pow_frames = ((1.0 / NFFT) * (mag_frames ** 2))
+    return pow_frames
 
 
 def hz_to_mel(hz):
+    """
+    Converts a frequency in Hz to a frequency in the mel scale.
+    :param hz: The frequency in Hz to be converted
+    :return: The frequency in the mel scale
+    """
     return 2595 * np.log10(1 + hz / 700)
 
 
 def mel_to_hz(mel):
+    """
+    Converts a frequency in the mel scale to a frequency in Hz.
+    :param mel: The frequency in the mel scale to be converted
+    :return: The frequency in Hz
+    """
     return 700 * (10**(mel / 2595) - 1)
 
 
@@ -80,16 +89,23 @@ def create_linear_filters(n_filters, n_fft):
     return fbank
 
 
-def create_mel_filters(num_filters, num_samples, sample_rate):
+def create_mel_filters(num_filters, n_fft, sample_rate):
+    """
+    Creates a set of mel filters to be applied to a magnitude spectrum.
+    :param num_filters: The number of filters to create
+    :param n_fft: The number of samples to be used in the FFT
+    :param sample_rate: The sample rate of the audio signal
+    :return: A two-dimensional array containing the mel filters
+    """
     low_freq_mel = hz_to_mel(0)
     high_freq_mel = hz_to_mel(sample_rate // 2)
 
     mel_points = np.linspace(low_freq_mel, high_freq_mel, num_filters + 2)  # +2 for the edges
     hz_points = mel_to_hz(mel_points)
 
-    indices = np.floor((num_samples + 1) * hz_points / sample_rate).astype(int)
+    indices = np.floor((n_fft // 2 + 1) * hz_points / sample_rate).astype(int)
 
-    filters = np.zeros((num_filters, int(np.floor(num_samples / 2))))
+    filters = np.zeros((num_filters, int(np.floor(n_fft // 2 + 1))))
 
     for i in range(1, num_filters + 1):
         left = indices[i - 1]
@@ -105,23 +121,39 @@ def create_mel_filters(num_filters, num_samples, sample_rate):
 
 
 def log_signal(signal):
+    """
+    Calculates the log of each value in a signal.
+    :param signal: The signal to be logged
+    :return: The logged signal
+    """
     return np.log10(signal)
 
 
-filters = create_mel_filters(40, 320, 16000)
+def dct_signal(signal):
+    """
+    Calculates the discrete cosine transform of a signal.
+    :param signal: The signal to be transformed
+    :return: The transformed signal
+    """
+    return dct(signal, type=2, axis=1, norm='ortho')
 
-for audio_file in sorted(glob.glob("audio/training/*.wav")):
-    r, sr = sf.read(audio_file)
 
-    print(f'Processing {Path(audio_file).stem}...')
-
-    frames = framed_signal(r, sr)
+def generate_mfccs(audio_signal, sample_rate, filters, ceps):
+    """
+    Generates the mel-frequency cepstral coefficients of an audio signal.
+    :param audio_signal: A one-dimensional array containing the audio signal
+    :param sample_rate: The sample rate of the audio signal
+    :param filters: A two-dimensional array containing the mel filters to be applied to the signal
+    :param ceps: The number of cepstral coefficients to be returned
+    :param nfft: The number of samples to be used in the FFT
+    :return: A two-dimensional array containing the mel-frequency cepstral coefficients of the signal
+    """
+    frames = framed_signal(audio_signal, sample_rate)
     windowed = windowed_signal(frames)
-    mag_spec = magnitude_spectrum(windowed)
-    filtered_signal = np.dot(filters, mag_spec.T)
+    pow_spec = power_spectrum(windowed, 512)
+    filtered_signal = np.dot(filters, pow_spec.T)
     log = log_signal(filtered_signal)
-    mfcc = dct(log, type=2, axis=1, norm='ortho')[:, 1: (12 + 1)]
+    mfcc = dct(log, type=2, axis=1, norm='ortho')
 
-    np.save(f'mfccs/training/{Path(audio_file).stem}.npy', mfcc)
+    return mfcc[:, 1: (ceps + 1)]  # Discards the first coefficient
 
-    print("Done.")
