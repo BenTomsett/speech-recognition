@@ -4,7 +4,7 @@ import numpy as np
 import tqdm
 from tqdm import tqdm
 from pathlib import Path
-from utils import dict_hash
+from utils import encode_params
 import soundfile as sf
 from feature_extraction import create_mel_filters, generate_mfccs
 
@@ -25,14 +25,14 @@ def process_file(file):
     filters = create_mel_filters(mfcc_params['n_filters'], mfcc_params['n_fft'], sample_rate)
     mfccs = generate_mfccs(audio, sample_rate, filters, mfcc_params['n_ceps'])
 
-    mfcc_path = Path(f'mfccs/{dict_hash(mfcc_params)}/training/{file.stem}.npy')
+    mfcc_path = Path(f'mfccs/{encode_params(mfcc_params)}/training/{file.stem}.npy')
     np.save(mfcc_path, mfccs)
 
     return mfccs
 
 
 def main():
-    mfcc_params_hash = dict_hash(mfcc_params)
+    mfcc_params_hash = encode_params(mfcc_params)
     mfcc_dir = Path(f'mfccs/{mfcc_params_hash}/training/')
     audio_dir = Path('audio/training/')
 
