@@ -58,4 +58,7 @@ for name in names:
 # print("Recording finished, plotting waveform and starting playback")
 #
 # print("Saving .wav file...")
-# sf.write(f
+# sf.write(f'speech{round(time.time() * 1000)}.wav', r, fs)
+
+
+
