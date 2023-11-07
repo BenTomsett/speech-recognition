@@ -18,15 +18,16 @@ input("Press enter to start...")
 # Recording constants
 sample_rate = 16000
 clip_length = 2
+num_recordings = 10
 
 for name in names:
     i = 0
 
-    while i < 20:
+    while i < num_recordings:
         os.system("clear")
 
         print("Name: " + name)
-        print("Recording " + str(i + 1) + " of 20")
+        print("Recording " + str(i + 1) + " of " + str(num_recordings))
 
         input("Press enter to start recording...")
 
@@ -42,7 +43,7 @@ for name in names:
 
         if save == "y":
             print("Recording finished, saving .wav file...")
-            sf.write(f'./audio/training/{name}-{i + 1}.wav', audio, sample_rate)
+            sf.write(f'./audio/testing/{name}-{i + 1}.wav', audio, sample_rate)
             print("Saved .wav file.")
 
             i += 1
@@ -57,7 +58,4 @@ for name in names:
 # print("Recording finished, plotting waveform and starting playback")
 #
 # print("Saving .wav file...")
-# sf.write(f'speech{round(time.time() * 1000)}.wav', r, fs)
-
-
-
+# sf.write(f
