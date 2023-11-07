@@ -3,8 +3,10 @@
 # Author: Ben Tomsett
 
 import numpy as np
+import soundfile
 from scipy.fft import dct
 import soundfile as sf
+import matplotlib.pyplot as plt
 
 
 def framed_signal(signal, sample_rate, frame_length=20, overlap=10):
@@ -138,6 +140,28 @@ def dct_signal(signal):
     return dct(signal, type=2, axis=1, norm='ortho')
 
 
+def calculate_deltas(mfccs, N=2):
+    """
+    Calculate the delta (first derivative) of the MFCCs.
+    :param mfccs: A two-dimensional array containing the MFCCs
+    :param N: The number of frames to use for creating the slope
+    :return: A two-dimensional array containing the deltas
+    """
+    if mfccs.shape[0] == 1:
+        return np.zeros(mfccs.shape)
+
+    denominator = 2 * sum([i ** 2 for i in range(1, N + 1)])
+    delta_mfccs = np.empty_like(mfccs)
+
+    padded_mfccs = np.pad(mfccs, ((N, N), (0, 0)), mode='edge')  # Pad with edge values
+
+    for t in range(mfccs.shape[0]):
+        delta_mfccs[t] = np.dot(np.arange(-N, N + 1),
+                                padded_mfccs[t: t + 2 * N + 1]) / denominator
+
+    return delta_mfccs
+
+
 def generate_mfccs(audio_signal, sample_rate, filters, ceps):
     """
     Generates the mel-frequency cepstral coefficients of an audio signal.
@@ -154,6 +178,13 @@ def generate_mfccs(audio_signal, sample_rate, filters, ceps):
     filtered_signal = np.dot(filters, pow_spec.T)
     log = log_signal(filtered_signal)
     mfcc = dct(log, type=2, axis=1, norm='ortho')
+    mfcc = mfcc[:, 1: (ceps + 1)]  # Discards the first coefficient
 
-    return mfcc[:, 1: (ceps + 1)]  # Discards the first coefficient
+    delta_mfcc = calculate_deltas(mfcc)
+    delta_delta_mfcc = calculate_deltas(delta_mfcc)
 
+    return np.hstack((mfcc, delta_mfcc, delta_delta_mfcc))
+
+
+r, sr = soundfile.read('audio/training/Ben-1.wav')
+generate_mfccs(r, sr, create_mel_filters(40, 512, sr), 12)
